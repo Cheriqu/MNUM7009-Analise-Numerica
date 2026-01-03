@@ -1,0 +1,204 @@
+---
+lang: "pt-br"
+output:
+  pdf_document:
+    extra_dependencies: float
+    latex_engine: xelatex
+    keep_tex: true
+  word_document: default
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage{cancel}
+- \usepackage{fancyhdr}
+- \usepackage{pdfpages}
+- \pagestyle{fancy}
+- \fancyhf{}
+- \renewcommand{\headrulewidth}{0pt}
+- \fancyfoot[L]{\includegraphics[width=2cm]{logo.png}}
+- \fancyfoot[C]{}
+- \fancyfoot[R]{Página \thepage}
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{=tex}
+\begin{titlepage}
+\centering
+\includegraphics[width=3cm]{logo.png}
+\vfill
+{\Huge Anáise Numérica\par}
+{\huge Avaliação 2\par}
+\vspace{1cm}
+{\Large Luiz Henrique Barretta Francisco - 202100155302 \par}
+\vfill
+{\large novembro/2025 \par}
+\end{titlepage}
+```
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+# Carregar bibliotecas
+suppressWarnings(library(deSolve))
+suppressWarnings(library(ggplot2))
+suppressWarnings(library(reshape2)) 
+suppressWarnings(library(knitr))
+```
+
+# 1. Introdução
+
+Este trabalho visa aplicar conceitos da segunda parte da disciplina de Análise Numérica para resolver um problema real. O problema escolhido é a modelagem da dinâmica populacional de duas espécies interagindo como predador e presa, descrito pelo modelo de Lotka-Volterra. Este é um problema clássico em biologia matemática e representa um sistema de Equações Diferenciais Ordinárias (EDOs) não-lineares de primeira ordem. O modelo é descrito por:
+$$\begin{aligned}
+\frac{dx}{dt} = \alpha x - \beta xy \quad \text{(Presa)} \hspace{2cm}
+\frac{dy}{dt} = \delta \beta xy - \gamma y \quad \text{(Predador)}
+\end{aligned}$$
+
+Onde $x$ é a população de presas, $y$ a de predadores, e $\alpha$, $\beta$, $\gamma$, $\delta$ são parâmetros que definem as taxas de interação. A aplicação de métodos numéricos, conforme estudado no Capítulo 8, é a abordagem mais adequada para este sistema.
+
+# 2. Metodologia: Conceitos Numéricos Aplicados
+
+Para resolver o sistema de EDOs, comparamos dois métodos numéricos de passo um discutidos no Capítulo 8:
+
+1. Método de Runge-Kutta (RK) de Alta Ordem (via `deSolve`): Utilizamos a função `ode` da biblioteca `deSolve`. Por padrão, ela usa o solver `lsoda`, que é um método adaptativo de passo múltiplo (Adams) e alta ordem, similar em precisão aos métodos de Runge-Kutta (p. 331). Esta solução será usada como a solução de referência devido a alta precisão.
+2.  Método de Euler (p. 320): Implementamos manualmente o método de Euler, o mais simples dos métodos de passo um. Sua fórmula de iteração é: $y_{n+1} = y_n + h \cdot f(t_n, y_n)$. Seu erro local é de ordem $O(h^2)$, o que leva a um rápido acúmulo de erro global.
+
+# 3. Implementação e Resultados
+
+Definimos a função do sistema, os parâmetros e as condições iniciais. Executamos o solver `deSolve` de alta precisão e medimos o tempo de execução. Também implementamos e executamos um loop para o método de Euler, usando um passo fixo `h = 0.01` (10.000 passos). Os gráficos 1 e 2 mostram a solução de referência precisa, capturando o ciclo limite estável do sistema.
+
+```{r, echo=FALSE}
+# 1. Definir a função do modelo de Lotka-Volterra
+lotka_volterra <- function(time, state, parameters) {
+with(as.list(c(state, parameters)), {
+# Equações do modelo
+dx_dt <- alpha * x - beta * x * y
+dy_dt <- delta * beta * x * y - gamma * y
+
+# Retornar as taxas de variação
+return(list(c(dx_dt, dy_dt)))
+})
+}
+
+# 2. Definir parâmetros e condições iniciais
+parameters <- c(alpha = 1.1, beta = 0.4, gamma = 0.4, delta = 0.2)
+initial_state <- c(x = 10, y = 2)
+
+# Definir o vetor de tempo (10001 pontos)
+times_rk <- seq(0, 100, by = 0.01)
+
+# Medir o tempo do solver 'ode'
+time_rk <- system.time({
+output_rk <- ode(y = initial_state, 
+times = times_rk, 
+func = lotka_volterra, 
+parms = parameters)
+})
+
+output_rk_df <- as.data.frame(output_rk)
+
+# Definir função do passo de Euler para o sistema
+euler_step <- function(state, parameters, dt) {
+# Calcular derivadas no ponto atual
+derivs <- lotka_volterra(0, state, parameters)[[1]]
+
+# Calcular novo estado
+new_state <- state + derivs * dt
+return(new_state)
+}
+
+# Medir o tempo do loop de Euler
+time_euler <- system.time({
+h <- 0.01
+times_euler <- seq(0, 100, by = h)
+n_steps <- length(times_euler)
+
+# Preparar matriz para guardar os resultados
+output_euler <- matrix(NA, nrow = n_steps, ncol = 3)
+output_euler[1, ] <- c(0, initial_state)
+colnames(output_euler) <- c("time", "x", "y")
+
+# Loop de simulação
+current_state <- initial_state
+for (i in 2:n_steps) {
+current_state <- euler_step(current_state, parameters, h)
+output_euler[i, ] <- c(times_euler[i], current_state)
+}
+
+output_euler_df <- as.data.frame(output_euler)
+})
+```
+
+
+```{r, echo=FALSE, fig.height=2.5, fig.align='center', fig.pos="H", fig.cap="Série temporal (Solução de Referência - Runge-Kutta)."}
+plot_data_rk <- melt(output_rk_df, id.vars = "time", variable.name = "Especie", value.name = "Populacao")
+
+ggplot(plot_data_rk, aes(x = time, y = Populacao, color = Especie)) +
+geom_line(linewidth = 1) +
+labs(title = "Dinâmica de Lotka-Volterra (Solução de Referência)",
+x = "Tempo", y = "População") +
+scale_color_manual(labels = c("Presas (x)", "Predadores (y)"), values = c("blue", "red")) +
+theme_minimal()
+```
+
+```{r, echo=FALSE, fig.height=3, fig.align='center', fig.pos="H", fig.cap="Diagrama de Fase (Solução de Referência - Runge-Kutta)."}
+ggplot(output_rk_df, aes(x = x, y = y)) +
+geom_path(linewidth = 1, color = "darkgreen") +
+labs(title = "Diagrama de Fase (Solução de Referência)",
+x = "População de Presas (x)", y = "População de Predadores (y)") +
+theme_minimal()
+```
+
+A solução de alta ordem (RK) mostra um ciclo limite perfeitamente estável e periódico, onde as populações oscilam de forma consistente ao longo do tempo, como esperado pelo modelo.
+
+Já o gráfico 3 compara a população de presas calculada pelo método de Euler com a solução de referência.
+
+```{r, echo=FALSE, fig.height=3.5, fig.align='center', fig.pos="H", fig.cap="Comparação do Método de Euler (h=0.01) com a Solução de Referência."}
+# Combinar os dataframes para comparação
+output_rk_df$Metodo <- "Referência (RK)"
+output_euler_df$Metodo <- "Euler (h=0.01)"
+
+# Selecionar apenas a população de Presas (x) para clareza
+compare_df <- rbind(output_rk_df[, c("time", "x", "Metodo")], 
+output_euler_df[, c("time", "x", "Metodo")])
+
+ggplot(compare_df, aes(x = time, y = x, color = Metodo)) +
+geom_line(aes(linetype = Metodo), linewidth = 1) +
+labs(title = "Comparação de Métodos: População de Presas (x)",
+x = "Tempo", y = "População") +
+scale_color_manual(values = c("red", "black")) +
+scale_linetype_manual(values = c("dashed", "solid")) +
+theme_minimal()
+```
+
+O gráfico mostra o principal defeito do método de Euler (erro de $O(h^2)$): instabilidade e acúmulo de erro. A solução de Euler (vermelho tracejado) diverge da solução de referência (preto), espiralando para fora. O método não consegue conservar a energia do sistema, levando a uma solução numericamente instável e incorreta, apesar de usar 10.000 passos.
+
+A tabela abaixo resume os resultados da simulação.
+
+```{r, echo=FALSE, fig.align='center', fig.pos="H"}
+# Calcular erro final (diferença no último ponto de tempo)
+erro_final_x <- abs(output_rk_df$x[10001] - output_euler_df$x[10001])
+erro_final_y <- abs(output_rk_df$y[10001] - output_euler_df$y[10001])
+erro_medio <- mean(c(erro_final_x, erro_final_y))
+
+# Criar a tabela
+tabela_comp <- data.frame(
+Metodo = c("Runge-Kutta Adaptivo (`lsoda`)", "Euler Explícito (h=0.01)"),
+Tempo_Exec_s = c(round(time_rk['elapsed'], 3), round(time_euler['elapsed'], 3)),
+Num_Passos = c(nrow(output_rk_df) - 1, nrow(output_euler_df) - 1),
+Resultado_Numerico = c("Preciso e estável (usado como Referência)", "Instável (divergente)"),
+Erro_Final_Medio = c(0.0, round(erro_medio, 3))
+)
+
+kable(tabela_comp, 
+caption = "Comparativo de Desempenho dos Métodos Numéricos.",
+col.names = c("Método", "Tempo (s)", "Nº de Passos", "Resultado", "Erro Final Médio"))
+```
+
+# 4. Conclusão
+
+O método de Runge-Kutta de 4ª ordem (e implementações adaptativas como `lsoda`) é computacionalmente mais intensivo por passo, mas, como demonstrado na Tabela 1, é capaz de resolver o sistema de EDOs de forma eficiente e estável.
+
+Em contraste, o Método de Euler, apesar de conceitualmente simples, mostrou-se inadequado para este problema. O Gráfico 3 e o Erro Final Médio na tabela comprovam que o acúmulo de erro de truncamento em cada passo (mesmo com 10.000 passos) torna a solução de Euler divergente e numericamente instável.
+
+Este trabalho então demonstra a aplicabilidade dos métodos do Capítulo, demonstrando a importância da escolha de um método de ordem superior (como Runge-Kutta) para a resolução de problemas reais complexos.

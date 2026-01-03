@@ -1,0 +1,211 @@
+---
+lang: "pt-br"
+output:
+  pdf_document:
+    extra_dependencies: float
+    latex_engine: xelatex
+  word_document: default
+header-includes:
+- \usepackage{cancel}
+- \usepackage{fancyhdr}
+- \usepackage{pdfpages}
+- \pagestyle{fancy}
+- \fancyhf{}
+- \renewcommand{\headrulewidth}{0pt}
+- \fancyfoot[L]{\includegraphics[width=2cm]{logo.png}}
+- \fancyfoot[C]{}
+- \fancyfoot[R]{Página \thepage}
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Tarefa 10
+
+6. Ajuste os dados:
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(ggplot2))
+
+dados <- data.frame(x = c(-8, -6, -4, -2, 0, 2, 4),
+                    y = c(30, 10, 9, 6, 5, 4, 4))
+print(dados)
+```
+
+a) usando a aproximação $y \approx \frac{y - 1}{a_o + a1x)}$. Faça o gráfico para $1/y$ e verifique que esta aproximação é viável;
+
+```{r}
+dados_a <- dados %>% mutate(z = 1 / y)
+
+plot_linear_a <- ggplot(dados_a, aes(x = x, y = z)) +
+  geom_point(color = "blue", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed") +
+  labs(title = "Verificação de Linearidade para o Ajuste (a)", x = "x", y = "z = 1/y") +
+  theme_minimal()
+print(plot_linear_a)
+
+modelo_a <- lm(z ~ x, data = dados_a)
+coef_a <- coef(modelo_a)
+a0 <- coef_a[1]
+a1 <- coef_a[2]
+
+cat(sprintf("Modelo linearizado: z = %.4f + %.4f * x", a0, a1))
+
+phi_a <- function(x_val) { 1 / (a0 + a1 * x_val) }
+
+plot_ajuste_a <- ggplot(dados, aes(x = x, y = y)) +
+  geom_point(color = "blue", size = 3, shape=1) +
+  stat_function(fun = phi_a, color = "red", linewidth = 1) +
+  labs(title = "Ajuste (a): y = 1 / (a0 + a1*x)", x = "x", y = "y") +
+  theme_minimal()
+print(plot_ajuste_a)
+```
+
+b) idem para $y \approx ab^x$;
+
+```{r}
+dados_b <- dados %>% mutate(z = log(y))
+
+plot_linear_b <- ggplot(dados_b, aes(x = x, y = z)) +
+  geom_point(color = "blue", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed") +
+  labs(title = "Verificação de Linearidade para o Ajuste (b)", x = "x", y = "z = ln(y)") +
+  theme_minimal()
+print(plot_linear_b)
+
+modelo_b <- lm(z ~ x, data = dados_b)
+coef_b <- coef(modelo_b)
+a0_ln <- coef_b[1] 
+a1_ln <- coef_b[2]
+
+a <- exp(a0_ln)
+b_exp <- exp(a1_ln)
+
+cat(sprintf("Modelo linearizado: z = %.4f + %.4f * x", a0_ln, a1_ln))
+cat(sprintf("Coeficientes originais estimados: a = %.4f, b = %.4f", a, b_exp))
+
+phi_b <- function(x_val) { a * (b_exp^x_val) }
+
+plot_ajuste_b <- ggplot(dados, aes(x = x, y = y)) +
+  geom_point(color = "blue", size = 3, shape = 1) +
+  stat_function(fun = phi_b, color = "green4", linewidth = 1) +
+  labs(title = "Ajuste (b): y = a * b^x", x = "x", y = "y") +
+  theme_minimal()
+print(plot_ajuste_b)
+```
+
+c) compare os resultados (a) e (b).
+
+```{r}
+plot_comparativo <- ggplot(dados, aes(x = x, y = y)) +
+  geom_point(color = "blue", size = 3, shape = 1, aes(label = "Dados Originais")) +
+  stat_function(fun = phi_a, aes(color = "Ajuste (a): 1/(a0+a1x)"), linewidth = 1) +
+  stat_function(fun = phi_b, aes(color = "Ajuste (b): a*b^x"), linewidth = 1) +
+  scale_color_manual(name = "Modelos", values = c("red", "green4")) +
+  labs(title = "Comparação dos Ajustes", x = "x", y = "y") +
+  theme_minimal() + theme(legend.position = "bottom")
+print(plot_comparativo)
+
+sse_a <- sum((dados$y - phi_a(dados$x))^2)
+sse_b <- sum((dados$y - phi_b(dados$x))^2)
+
+cat(sprintf("SSE para o Ajuste (a) [y = 1/(a0+a1x)]: %.4f", sse_a))
+cat(sprintf("SSE para o Ajuste (b) [y = a*b^x]      : %.4f", sse_b))
+```
+
+O ajuste (a) apresentou menor SSE na escala original e portanto deve ser o escolhido para essa aproximação.
+
+7. O número de bactérias, por unidade de volume, existente em uma cultura após x horas é apresentado na tabela:
+
+
+```{r}
+dados_bac <- data.frame(x = 0:6,
+                        y = c(32, 47, 65, 92, 132, 190, 275))
+print(dados_bac)
+```
+
+a) verifique que uma curva para se ajustar ao diagrama de dispersão é do tipo exponencial;
+
+```{r}
+plot_dispersao <- ggplot(dados_bac, aes(x = x, y = y)) +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Diagrama de Dispersão Original",
+       x = "Horas (x)", y = "Número de Bactérias (y)") +
+  theme_minimal()
+print(plot_dispersao)
+
+dados_exp_linear <- dados_bac %>% mutate(z = log(y))
+plot_semilog <- ggplot(dados_exp_linear, aes(x = x, y = z)) +
+  geom_point(color = "blue", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red", linetype = "dashed") +
+  labs(title = "Verificação de Linearidade (Semi-log)",
+       x = "Horas (x)", y = "z = ln(Número de Bactérias)") +
+  theme_minimal()
+print(plot_semilog)
+```
+
+b) ajuste aos da.dos as curvas $y = ab^x$ e $y = ax^b$; compare os valores obtidos por
+meio destas equações com os dados experimentais; 
+
+```{r}
+modelo_exp <- lm(z ~ x, data = dados_exp_linear)
+coef_exp <- coef(modelo_exp)
+a0_ln <- coef_exp[1] 
+a1_ln <- coef_exp[2]
+
+a_exp <- exp(a0_ln)
+b_exp <- exp(a1_ln)
+
+cat(sprintf("Modelo linearizado: ln(y) = %.4f + %.4f * x", a0_ln, a1_ln))
+cat(sprintf("Coeficientes originais estimados: a = %.4f, b = %.4f", a_exp, b_exp))
+
+phi_exp <- function(x_val) { a_exp * (b_exp^x_val) }
+sse_exp <- sum((dados_bac$y - phi_exp(dados_bac$x))^2)
+cat(sprintf("SSE (escala original): %.4f", sse_exp))
+
+dados_pot_linear <- dados_bac %>% 
+  filter(x > 0) %>% 
+  mutate(t = log(x), w = log(y))
+
+modelo_pot <- lm(w ~ t, data = dados_pot_linear)
+coef_pot <- coef(modelo_pot)
+c0_ln <- coef_pot[1] 
+c1 <- coef_pot[2] 
+
+a_pot <- exp(c0_ln)
+b_pot <- c1
+
+cat(sprintf("Modelo linearizado: ln(y) = %.4f + %.4f * ln(x)", c0_ln, c1))
+cat(sprintf("Coeficientes originais estimados: a = %.4f, b = %.4f", a_pot, b_pot))
+
+phi_pot <- function(x_val) { ifelse(x_val > 0, a_pot * (x_val^b_pot), NA) }
+
+sse_pot <- sum((dados_bac$y[dados_bac$x > 0] -
+                  phi_pot(dados_bac$x[dados_bac$x > 0]))^2)
+cat(sprintf("SSE (escala original, x > 0): %.4f", sse_pot))
+
+plot_comparativo_bacterias <- ggplot(dados_bac, aes(x = x, y = y)) +
+  geom_point(color = "blue", size = 3, shape = 1) +
+  stat_function(fun = phi_exp, aes(color = "Ajuste Exp: a*b^x"), linewidth = 1) +
+  stat_function(fun = phi_pot, aes(color = "Ajuste Pot: a*x^b"), linewidth = 1, na.rm = TRUE) +
+  scale_color_manual(name = "Modelos", values = c("red", "blue")) +
+  labs(title = "Comparação dos Ajustes para Crescimento Bacteriano",
+       x = "Horas (x)", y = "Número de Bactérias (y)") +
+  theme_minimal() + theme(legend.position = "bottom")
+print(plot_comparativo_bacterias)
+
+cat(sprintf("Comparação SSE (x > 0): Exp = %.4f, Pot = %.4f", sse_exp, sse_pot))
+
+```
+
+Conclusão: O ajuste exponencial $y = ab^x$ apresentou menor SSE na escala original (para x>0).
+
+c) avalie da melhor forma o valor de $y(x)$ para $x = 7$. 
+
+```{r}
+y_estimado_7 <- phi_exp(7)
+cat(sprintf("Usando o modelo y = %.4f * (%.4f)^x:", a_exp, b_exp))
+cat(sprintf("O número estimado de bactérias após 7 horas é: %.0f\n", y_estimado_7))
+```

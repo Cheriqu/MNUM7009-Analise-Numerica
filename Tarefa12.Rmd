@@ -1,0 +1,96 @@
+---
+lang: "pt-br"
+output:
+  pdf_document:
+    extra_dependencies: float
+    latex_engine: xelatex
+  word_document: default
+  html_document:
+    df_print: paged
+header-includes:
+- \usepackage{cancel}
+- \usepackage{fancyhdr}
+- \usepackage{pdfpages}
+- \pagestyle{fancy}
+- \fancyhf{}
+- \renewcommand{\headrulewidth}{0pt}
+- \fancyfoot[L]{\includegraphics[width=2cm]{logo.png}}
+- \fancyfoot[C]{}
+- \fancyfoot[R]{Página \thepage}
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+# Tarefa 12
+
+3. Dado o PVI abaixo, considere $h = 0.5, 0.25, 0.125$ e $0.1$. 
+$$ \begin{cases} y' = 4 - 2x \\ y(0) = 2 \end{cases} $$
+
+a) Encontre uma aproximação para $y(5)$ usando o método de Euler Aperfeiçoado, para cada h. 
+
+```{r}
+f <- function(x, y) {4 - 2 * x}
+y_exato_fun <- function(x) {-x^2 + 4 * x + 2}
+h_valores <- c(0.5, 0.25, 0.125, 0.1)
+resultados_lista <- list()
+
+for (h in h_valores) {x_final <- 5
+                      n_passos <- x_final / h
+                      x <- seq(0, x_final, by = h)
+                      y <- numeric(n_passos + 1)
+                      y[1] <- 2
+                        for (i in 1:n_passos) {
+                          x_n <- x[i]
+                          y_n <- y[i]
+                          k1 <- f(x_n, y_n)
+                          y_preditor <- y_n + h * k1
+                          k2 <- f(x_n + h, y_preditor)
+                          y[i + 1] <- y_n + (h / 2) * (k1 + k2)}
+                      resultado_final <- y[n_passos + 1]
+                      resultados_lista[[as.character(h)]] <- resultado_final}
+y_exato_5 <- y_exato_fun(5)
+
+tabela_resultados <- data.frame(h = h_valores,
+                                y_aproximado = unlist(resultados_lista),
+                                y_exato = y_exato_5)
+tabela_resultados$Erro_Absoluto <- abs(tabela_resultados$y_exato - tabela_resultados$y_aproximado)
+knitr::kable(tabela_resultados, digits = 8, caption = "Resultados do Método de Euler Aperfeiçoado")
+```
+
+b) Compare seus resultados com a solução exata dada por $y(x) = -x^2 + 4x + 2$. Justifique.
+
+Os resultados obtidos pelo Método de Euler Aperfeiçoado são iguais à solução exata $y(5)=-3$ para todos os valores de $h$ testados. O erro é zero (ou um valor insignificante devido à aritmética de ponto flutuante). A justificativa para isso é: 
+ 
+ * .1 Ordem do Método: O Método de Euler Aperfeiçoado (também conhecido como método de Heun) é um método de Runge-Kutta de 2ª ordem.
+ 
+ * 2. Fórmula do Erro: O erro de truncamento local para um método de 2ª ordem é da ordem de $O(h^3)$ e depende da terceira derivada da solução, $y'''(x)$.
+ 
+ * 3. Análise da Solução: A solução exata do PVI é o polinômio $y(x) = -x^2 + 4x + 2$. Calculando suas derivadas, temos:
+ 
+ \hspace{2cm} \bullet $y'(x) = -2x + 4$ \hspace{2cm} \bullet $y''(x) = -2$ \hspace{2cm} \bullet $y'''(x) = 0$
+ 
+ * 4. Conclusão: Como a terceira derivada da solução é zero para todo $x$, o erro de truncamento local do Método de Euler Aperfeiçoado é zero em cada passo do cálculo. Sem erro local para acumular, a aproximação numérica permanece exata, independentemente do tamanho do passo $h$.
+
+c) Você espera o mesmo resultado do item (b) usando o método de Euler? Justifique.
+
+```{r}
+h_euler <- 0.5
+n_euler <- 5 / h_euler
+x_euler <- seq(0, 5, by = h_euler)
+y_euler <- numeric(n_euler + 1)
+y_euler[1] <- 2
+for (i in 1:n_euler) {y_euler[i + 1] <- y_euler[i] + h_euler * f(x_euler[i], y_euler[i])}
+resultado_euler <- y_euler[n_euler + 1]
+resultado_euler
+```
+
+Não espero o mesmo resultado exato usando o método de Euler simples. A justificativa para isso é:
+ 
+ * Ordem do Método: O Método de Euler simples é um método de 1ª ordem.
+ 
+ * Fórmula do Erro: O erro de truncamento local do Método de Euler é da ordem de $O(h^2)$ e depende da segunda derivada da solução, $y''(\xi)$.
+ 
+ * Análise da Solução: Como visto no item anterior, a segunda derivada da solução exata é $y''(x) = -2$, que é uma constante diferente de zero.
+ 
+ * Conclusão: Como o erro local (proporcional a $-h^2$) é diferente de zero, o Método de Euler acumulará um erro a cada passo. Portanto, a aproximação final não será exata e seu valor dependerá do passo $h$ utilizado. Por exemplo, o cálculo para $h=0.5$ fornece $y(5) \approx -0.5$, que é significativamente diferente do valor exato de -3.0.
